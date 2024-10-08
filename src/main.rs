@@ -1,6 +1,7 @@
 use std::{
-    fs::File,
+    fs::{File, OpenOptions},
     io::{self, BufReader},
+    os::unix::fs::OpenOptionsExt,
 };
 
 use serde::{Deserialize, Serialize};
@@ -12,10 +13,8 @@ struct Todo {
     completed: bool,
 }
 
-fn main() -> Result<()> {
-    let file_path = "todos.json";
-
-    Ok(())
+fn main() {
+    println!("hellow")
 }
 
 fn load_todos(file_path: &str) -> io::Result<Vec<Todo>> {
@@ -28,4 +27,14 @@ fn load_todos(file_path: &str) -> io::Result<Vec<Todo>> {
     };
 
     Ok(todos)
+}
+
+fn save_todos(file_path: &str, todos: &[Todo]) -> io::Result<()> {
+    let file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(file_path)?;
+
+    serde_json::to_writer_pretty(file, todos)?;
+    Ok(())
 }
