@@ -1,20 +1,17 @@
-use std::{
-    fs::{File, OpenOptions},
-    io::{self, BufReader},
-    os::unix::fs::OpenOptionsExt,
-};
-
 use serde::{Deserialize, Serialize};
+use serde_json;
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufRead, BufReader, Write};
+use std::path::Path;
+use termion::event::Key;
+use termion::input::TermRead;
+use termion::raw::IntoRawMode;
 
 #[derive(Serialize, Deserialize)]
 struct Todo {
     id: usize,
     title: String,
     completed: bool,
-}
-
-fn main() {
-    println!("hellow")
 }
 
 fn load_todos(file_path: &str) -> io::Result<Vec<Todo>> {
@@ -39,7 +36,7 @@ fn save_todos(file_path: &str, todos: &[Todo]) -> io::Result<()> {
     Ok(())
 }
 
-fn display_todo(todos: &[Todo]) {
+fn display_todos(todos: &[Todo]) {
     println!("\x1B[2J\x1B[1;1H");
     println!("Todo List:");
     for todo in todos.iter() {
@@ -63,4 +60,63 @@ fn add_todo(next_id: usize) -> io::Result<Todo> {
     })
 }
 
-fn 
+fn toggle_todo(todos: &mut Vec<Todo>) {
+    println!("Enter todo number in toggle:");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    if let Ok(index) = input.trim().parse::<usize>() {
+        if index > 0 && index <= todos.len() {
+            todos[index - 1].completed = !todos[index - 1].completed;
+        }
+    }
+}
+
+fn delete_todo(todos: &mut Vec<Todo>) {
+    println!("Enter todo number to delete:");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    if let Ok(index) = input.trim().parse::<usize>() {
+        if index > 0 && index <= todos.len() {
+            todos.remove(index - 1);
+            for (i, todo) in todos.iter_mut().enumerate() {
+                todo.id = i;
+            }
+        }
+    }
+}
+
+fn main() -> io::Result<()> {
+    let file_path = "todos.json";
+    let mut todos = load_todos(file_path)?;
+
+    let mut stdout = io::stdout().into_raw_mode()?;
+    let stdin = io::stdin();
+
+    loop {
+        display_todos(&todos);
+        println!("\nCommands: (a)dd, (x) toggle, (d)elete, (q)uit");
+
+        for c in stdin.keys() {
+            match c.unwrap() {
+                Key::Char('a') => {
+                    let new_todo = add_todo(todos.len())?;
+                    todos.push(new_todo);
+                    save_todos(file_path, &todos)?;
+                    break;
+                }
+                Key::Char('x') => {
+                    toggle_todo(&mut todos);
+                    save_todos(file_path, &todos)?;
+                    break;
+                }
+                Key::Char('d') => {
+                    delete_todo(&mut todos);
+                    save_todos(file_path, &todos)?;
+                    break;
+                }
+                Key::Char('q') => return Ok(()),
+                _ => {}
+            }
+        }
+    }
+}
